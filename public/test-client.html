@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Crypto Crash WebSocket Test</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f7f9;
+      color: #333;
+      padding: 40px;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #222;
+    }
+
+    label {
+      font-size: 1.1em;
+      margin-right: 10px;
+    }
+
+    select {
+      font-size: 1em;
+      padding: 10px;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      transition: border 0.3s ease;
+    }
+    #betAmount{
+      font-size: 1em;
+      padding: 10px;
+      margin-top: 10px;
+      margin-bottom: 20px;
+      width: calc(100% - 50px);
+      box-sizing: border-box;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      transition: border 0.3s ease;
+    }
+
+    .input-group {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    input:focus,
+    select:focus {
+      border: 2px solid #4CAF50;
+      outline: none;
+    }
+
+    #btn {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 10px 5px 20px 0;
+    }
+
+    #btn:hover {
+      background-color: #45a049;
+    }
+
+    .balance-info {
+      font-size: 1.1em;
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+    }
+
+    #btc,
+    #eth,
+    #currBTC,
+    #currETH,
+    #btc-usd,
+    #eth-usd {
+      font-weight: bold;
+    }
+
+    #countdown {
+      font-size: 1.4em;
+      color: #e53935;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    #multiplier {
+      font-size: 2em;
+      color: #e53935;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+
+    #log {
+      font-family: monospace;
+      white-space: pre-wrap;
+      background-color: #e0e0e0;
+      padding: 15px;
+      border-radius: 5px;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 20px;
+      box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🚀 Crypto Crash WebSocket Test</h1>
+
+  <div class="balance-info">
+    <div>
+      <p>Current BTC(in USD): <span id="currBTC">loading...</span></p>
+    </div>
+    <div>
+      <p>Current ETH(in USD): <span id="currETH">loading...</span></p>
+    </div>
+  </div>
+
+  <label for="playerSelect">Select Player:</label>
+  <select id="playerSelect"></select>
+
+  <div class="balance-info">
+    <div>
+      <p>Available BTC: <span id="btc">loading...</span></p>
+      <p>In USD: <span id="btc-usd">loading...</span></p>
+    </div>
+    <div>
+      <p>Available ETH: <span id="eth">loading...</span></p>
+      <p>In USD: <span id="eth-usd">loading...</span></p>
+    </div>
+  </div>
+
+  <p id="countdown"></p>
+  <p>Multiplier: <span id="multiplier">1.00</span> <strong>X</strong></p>
+
+  <div>
+    <div>
+      <input type="number" id="betAmount" placeholder="Bet Amount (USD)" required oninput="updateHandler()">
+      <span>USD</span>
+    </div>
+    <div class="input-group">
+      <div>
+        <input type="number" id="bet-usd-btc" placeholder="USD to BTC" required disabled>
+        <span>BTC</span>
+      </div>
+      <div>OR</div>
+      <div>
+        <input type="number" id="bet-usd-eth" placeholder="USD to ETH" required disabled>
+        <span>ETH</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="button-group">
+    <button class="betBtn" id="btn" onclick="placeBet('BTC')">🎯 Place Bet in BTC</button>
+    <button class="betBtn" id="btn" onclick="placeBet('ETH')">🎯 Place Bet in ETH</button>
+    <button onclick="cashOut()" id="btn">💸 Cash Out</button>
+  </div>
+
+  <pre id="log"></pre>
+
+  <!-- <style>
+    #log {
+      font-family: monospace;
+      white-space: pre-wrap;
+      background-color: #f0f0f0;
+      padding: 10px;
+      border-radius: 5px;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+
+    /* #multiplier {
+      font-weight: bold;
+      font-size: 1.5em;
+    } */
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      color: #333;
+      padding: 20px;
+    }
+
+    #btn {
+      background-color: #4CAF50;
+      /* Green */
+      border: none;
+      color: white;
+      padding: 15px 32px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+      margin: 4px 2px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    #btn:hover {
+      background-color: #45a049;
+    }
+
+    select {
+      padding: 5px;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+
+    input {
+      padding: 5px;
+      font-size: 16px;
+      margin-top: 10px;
+      width: 200px;
+    }
+
+    input:focus {
+      border: 2px solid #4CAF50;
+      outline: none;
+    }
+    #btc, #eth {
+      font-weight: bold;
+    }
+    #btn:hover {
+      background-color: #45a049;
+    }
+    h1 {
+      color: #333;
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+    label {
+      font-size: 1.2em;
+      margin-right: 10px;
+    }
+    p {
+      font-size: 1.2em;
+      margin: 5px 0;
+    }
+    #countdown {
+      font-size: 1.5em;
+      color: #ff0000;
+      font-weight: bold;
+    }
+    #multiplier {
+      font-size: 2em;
+      color: #ff0000;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🚀 Crypto Crash WebSocket Test</h1>
+  <label for="playerSelect">Select Player:</label>
+  <select id="playerSelect"></select>
+  <p>Available BTC: <span id="btc"></span></p>
+  <p>Available ETH: <span id="eth"></span></p>
+  <p id="countdown"></p>
+  <p>Multiplier: <span id="multiplier">1.00</span>x</p>
+  <input type="number" id="betAmount" placeholder="Bet Amount (USD)" defaultValue="1" min="1" required>
+  <button id="btn">Bet</button>
+  <button onclick="cashOut()" id="btn">💸 Cash Out</button>
+  <pre id="log"></pre> -->
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script>
+    const socket = io("http://localhost:3000");
+    let playerId = "satoshi";
+    let playerDBId = null;
+    let currentMultiplier = 1;
+    let roundId = null;
+    let socketId = null;
+    let dataNames = null;
+    let betted = false;
+
+
+    socket.on('connect', () => {
+      socketId = socket.id;
+      log(`Connected to server, socketId: ${socketId}`);
+      socket.emit('getPlayerList', { socketId }); // Request player list from server and send socketId
+    });
+    socket.on('disconnect', () => log(`Disconnected from server socketId: ${socketId}`));
+    socket.on('connect_error', (err) => log(`Connection error: ${err.message}`));
+
+    socket.on('roundStart', (data) => {
+      roundId = data.roundId;
+      betted = false;
+      currentMultiplier = 1;
+      document.getElementById('countdown').innerText = "Round started! 🟢";
+      log(`🟢 New Round Started: ${roundId}`);
+    });
+
+    socket.on('multiplierUpdate', (data) => {
+      currentMultiplier = data.multiplier;
+      document.getElementById('multiplier').textContent = currentMultiplier;
+    });
+
+    socket.on('roundCrash', (data) => {
+      betted = true;
+      roundId = null;
+      log(`💥 CRASHED at ${data.crashMultiplier}x`);
+    });
+
+    socket.on('playerCashout', (data) => {
+      log(`✅ Player ${data.playerId} cashed out at ${data.multiplier}x, won $${data.payoutUsd.toFixed(2)}`);
+    });
+
+    socket.on('cashoutError', (err) => {
+      log(`❌ Cashout error: ${err.error}`);
+    });
+
+    socket.on('updateBalance', (data) => {
+      // console.log("Balance update received:", data);
+
+      document.getElementById('btc').textContent = data.BTC.toFixed(8);
+      document.getElementById('eth').textContent = data.ETH.toFixed(8);
+      const btcUsd = parseFloat(document.getElementById('currBTC').textContent);
+      const ethUsd = parseFloat(document.getElementById('currETH').textContent);
+      if (isNaN(btcUsd) || isNaN(ethUsd)) {
+        log("⚠️ Fetching prices...");
+        return;
+      }
+      document.getElementById('btc-usd').textContent = (data.BTC * btcUsd).toFixed(2);
+      document.getElementById('eth-usd').textContent = (data.ETH * ethUsd).toFixed(2);
+    });
+
+    socket.on('countdown', (data) => {
+      document.getElementById('countdown').textContent = `⏳ Round starts in ${data.seconds} seconds`;
+    });
+
+    socket.on('selectPlayerError', (err) => {
+      log(`❌ Player selection error: ${err.error}`);
+    });
+
+    socket.on('betPlaced', (data) => {
+      betted = true;
+      log(`✅ Bet placed: ${data.usdAmount} USD = ${data.cryptoAmount} on ${data.currency}, roundId: ${data.roundId}`);
+    });
+
+    socket.on('currentPrice', (data) => {
+      console.log("Current price received:", data.price.BTC, data.price.ETH);
+      if (data.price.BTC) {
+        document.getElementById('currBTC').textContent = data.price.BTC;
+        document.getElementById('currETH').textContent = data.price.ETH;
+        document.getElementById('btc-usd').textContent = (data.price.BTC * parseFloat(document.getElementById('btc').textContent)).toFixed(2);
+        document.getElementById('eth-usd').textContent = (data.price.ETH * parseFloat(document.getElementById('eth').textContent)).toFixed(2);
+      }
+    });
+    // Fetch player list from server
+    socket.on('playerList', (data) => {
+      // console.log("Player list received:", data);
+      dataNames = data.playerList.reduce((acc, player) => {
+        acc[player.id] = player.name;
+        return acc;
+      }, {});
+      if (!data.playerList) {
+        log("⚠️ No players found.");
+        return;
+      }
+      playerId = data.playerList[0].name; // Default to the first player in the list
+      playerDBId = data.playerList[0].id; // Default to the first player in the list
+      socket.emit('selectPlayer', { socketId, playerId: data.playerList[0].id }); // Select the first player
+      const playerSelect = document.getElementById('playerSelect');
+      playerSelect.innerHTML = '';
+
+      data.playerList.forEach(player => {
+        const option = document.createElement('option');
+        option.value = player.id;
+        option.textContent = player.name;
+        playerSelect.appendChild(option);
+      });
+    });
+
+    // Update playerId when selection changes
+    document.getElementById('playerSelect').addEventListener('change', (event) => {
+      playerId = event.target.value;
+      socket.emit('selectPlayer', { socketId, playerId });
+      log(`Player selected: ${dataNames[playerId]}`);
+    });
+
+    function cashOut() {
+      if (!roundId) {
+        log("⚠️ No round active.");
+        return;
+      }
+
+      socket.emit("cashout", {
+        playerId,
+        roundId,
+        multiplier: currentMultiplier
+      });
+      log(`🚨 Sent cashout at ${currentMultiplier}x`);
+    }
+
+    function log(message) {
+      const logElem = document.getElementById("log");
+      logElem.textContent = message + "\n" + logElem.textContent;
+    }
+
+    function placeBet(currency) {
+      if (!roundId) {
+        log("⚠️ No round active.");
+        return;
+      }
+      if (isNaN(betAmount) || betAmount <= 0) {
+        log("⚠️ Invalid bet amount.");
+        return;
+      }
+      if (betted) {
+        log("⚠️ You already placed a bet this round.");
+        return;
+      }
+      const betAmount = parseFloat(document.getElementById('betAmount').value);
+      betted = true;
+      socket.emit("placeBet", {
+        playerId: playerDBId,
+        roundId,
+        usdAmount: betAmount,
+        currency,
+        socketId
+      });
+    }
+
+    function updateHandler() {
+      const betAmount = parseFloat(document.getElementById('betAmount').value);
+      const btcPrice = parseFloat(document.getElementById('currBTC').textContent);
+      const ethPrice = parseFloat(document.getElementById('currETH').textContent);
+      console.log("Bet amount:", betAmount, "BTC price:", btcPrice, "ETH price:", ethPrice);
+      
+      if (isNaN(betAmount) || betAmount <= 0 || isNaN(btcPrice) || isNaN(ethPrice)) {
+        document.getElementById('bet-usd-btc').value = 0;
+        document.getElementById('bet-usd-eth').value = 0;
+        return;
+      }
+      document.getElementById('bet-usd-btc').value = (betAmount / btcPrice).toFixed(8);
+      document.getElementById('bet-usd-eth').value = (betAmount / ethPrice).toFixed(8);
+    }
+
+  </script>
+</body>
+
+</html>
