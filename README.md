@@ -16,16 +16,20 @@ This is the backend implementation of **Crypto Crash**, a real-time multiplayer 
 ## ⚙️ Setup Instructions
 
 1. **Clone the repo**  
+```
   - git clone https://github.com/sudhanshuBHU/crypto-crash-game.git
   - cd crypto-crash-game
+  ```
 
 2. **Install dependencies**  
-  - npm install
+  - ```npm install```
 
 3. **Create `.env`**
+```
   - PORT=3000
   - MONGO_URI=mongodb://localhost:27017/crypto_crash_sudhanshu
   - CRYPTO_API=https://api.coingecko.com/api/v3
+```
 
 **(make sure that MongoDB is running in the background)**
 
@@ -33,7 +37,7 @@ This is the backend implementation of **Crypto Crash**, a real-time multiplayer 
   - ``` node scripts/seed.js ```
 
 5. **Run the server**
-  ``` npm run dev ```
+  - ``` npm run dev ```
 
 6. **Open test client**  
    [http://localhost:3000/](http://localhost:3000/)
