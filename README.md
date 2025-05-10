@@ -109,17 +109,24 @@ Crash multiplier is generated using:
 ---
 
 # Images for reference
+1. Postman API test
 ![Postman Api test](public/images/postman.png "Postman api test")
 
+2. Snapshot of DB - Game rounds
 ![DB Game rounds](public/images/gamerounds.png "gamerounds-DB")
 
+3. Snapshot of DB - Transactions
 ![DB Transactions](public/images/transactions.png "transactions-DB")
 
+4. Snapshot of DB - test players
 ![DB Test players](public/images/test%20players.png "test players-DB")
 
+5. Snapshot of Home page
 ![UI home](public/images/home%201.png "UI Home")
 
+6. Snapshot of Home page - logs
 ![UI Betting](public/images/home2.png "UI Home Betting")
 
+7. Snapshot of multiple players are betting in the same round
 ![UI multiple players](public/images/home3.png "multiple players")
 
