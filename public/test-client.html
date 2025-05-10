@@ -326,7 +326,7 @@
     });
 
     socket.on('playerCashout', (data) => {
-      log(`✅ Player ${data.playerId} cashed out at ${data.multiplier}x, won $${data.payoutUsd.toFixed(2)}`);
+      log(`✅ Player ${data.playerId} cashed out at ${data.multiplier}x, won $${data.payoutUsd.toFixed(2)} in roundId: ${data.roundId}`);
     });
 
     socket.on('cashoutError', (err) => {
@@ -403,17 +403,18 @@
     });
 
     function cashOut() {
-      if (!roundId) {
-        log("⚠️ No round active.");
-        return;
-      }
+      // if (!roundId) {
+      //   log("⚠️ No round active.");
+      //   return;
+      // }
 
       socket.emit("cashout", {
-        playerId,
+        playerId: playerDBId,
+        socketId,
         roundId,
         multiplier: currentMultiplier
       });
-      log(`🚨 Sent cashout at ${currentMultiplier}x`);
+      log(`🚨 Clicked cashout at ${currentMultiplier}x`);
     }
 
     function log(message) {
@@ -422,6 +423,7 @@
     }
 
     function placeBet(currency) {
+      const betAmount = parseFloat(document.getElementById('betAmount').value);
       if (!roundId) {
         log("⚠️ No round active.");
         return;
@@ -434,7 +436,6 @@
         log("⚠️ You already placed a bet this round.");
         return;
       }
-      const betAmount = parseFloat(document.getElementById('betAmount').value);
       betted = true;
       socket.emit("placeBet", {
         playerId: playerDBId,

@@ -4,13 +4,13 @@ const crypto = require('crypto');
 const { Server } = require('socket.io');
 
 const Player = require('../models/Player');
-const { convertUsdToCrypto } = require('../utils/conversion');
+const { convertUsdToCrypto, convertCryptoToUsd } = require('../utils/conversion');
 const Transaction = require('../models/Transaction');
 
 const { fetchPrices } = require('../services/priceService');
 
-let currentRound = null;
-let multiplierInterval = null;
+// let currentRound = null;
+// let multiplierInterval = null;
 let io = null;
 
 function startGameLoop(httpServer) {
@@ -20,31 +20,61 @@ function startGameLoop(httpServer) {
 
     io.on('connection', socket => {
         console.log(`New client connected with socket ID: ${socket.id}`);
-        socket.on('cashout', async ({ playerId, roundId, multiplier }) => {
-            try {
-                if (!currentRound || currentRound.roundId !== roundId || currentRound.ended) {
-                    return socket.emit('cashoutError', { error: 'Invalid or ended round' });
-                }
 
-                const bet = currentRound.bets.find(
-                    (b) => b.playerId.toString() === playerId && !b.cashedOut
-                );
-                if (!bet) {
+        socket.on('cashout', async ({ playerId, socketId, roundId, multiplier }) => {
+            try {
+                // if (!currentRound || currentRound.roundId !== roundId || currentRound.ended) {
+                //     return socket.emit('cashoutError', { error: 'Invalid or ended round' });
+                // }
+
+                const round = await GameRound.findOne({
+                    roundId,
+                    ended: false,
+                    'bets.playerId': playerId,
+                    'bets.cashedOut': false
+                });
+
+                // console.log('Round:', round);
+
+                if (!round) {
                     return socket.emit('cashoutError', { error: 'No active bet to cash out' });
                 }
 
+                const bet = round.bets.find(b => b.playerId.toString() === playerId);
+                if (!bet) {
+                    return socket.emit('cashoutError', { error: 'Bet not found' });
+                }
+
+                // console.log('Bet:', bet);
+
                 const payoutCrypto = bet.cryptoAmount * multiplier;
                 const { usd: payoutUsd, price } = await convertCryptoToUsd(payoutCrypto, bet.currency);
+                // console.log('Payout:', { payoutCrypto, payoutUsd, price });
 
-                const player = await Player.findById(playerId);
-                player.wallet[bet.currency] += payoutCrypto;
-                await player.save();
+                // Atomic wallet update
+                const player = await Player.findByIdAndUpdate(
+                    playerId,
+                    { $inc: { [`wallet.${bet.currency}`]: payoutCrypto } },
+                    { new: true }
+                );
 
-                bet.cashedOut = true;
-                bet.cashoutMultiplier = multiplier;
-                bet.payoutUsd = payoutUsd;
-                await currentRound.save();
+                // Atomic bet update
+                await GameRound.updateOne(
+                    {
+                        roundId,
+                        'bets.playerId': playerId,
+                        'bets.cashedOut': false
+                    },
+                    {
+                        $set: {
+                            'bets.$.cashedOut': true,
+                            'bets.$.cashoutMultiplier': multiplier,
+                            'bets.$.payoutUsd': payoutUsd
+                        }
+                    }
+                );
 
+                // Record transaction
                 const tx = new Transaction({
                     playerId,
                     usdAmount: payoutUsd,
@@ -56,12 +86,14 @@ function startGameLoop(httpServer) {
                 });
                 await tx.save();
 
+                io.to(socketId).emit('updateBalance', player.wallet);
                 io.emit('playerCashout', {
                     playerId,
                     roundId,
                     multiplier,
                     payoutUsd,
                 });
+
             } catch (err) {
                 console.error('WebSocket cashout error:', err);
                 socket.emit('cashoutError', { error: 'Internal server error' });
@@ -93,50 +125,79 @@ function startGameLoop(httpServer) {
                 io.to(socketId).emit('selectPlayerError', { error: 'Failed to select player' });
             }
         });
-        socket.on('placeBet', async ({ playerId, socketId, usdAmount, currency, roundId }) => { // playerId is _id of player model
+        socket.on('placeBet', async ({ playerId, socketId, usdAmount, currency, roundId }) => {
+
             // console.log('Placing bet:', { playerId, usdAmount, currency, roundId });
-            if (!playerId || !usdAmount || !currency) {
-                io.to(socketId).emit('placeBetError', { error: 'Missing required fields' });
-                return;
+
+            if (!playerId || !usdAmount || !currency || usdAmount <= 0) {
+                return io.to(socketId).emit('placeBetError', { error: 'Invalid input data' });
             }
-            if (usdAmount <= 0) {
-                io.to(socketId).emit('placeBetError', { error: 'USD amount must be positive' });
-                return;
-            }
+
             try {
                 const player = await Player.findById(playerId);
                 // console.log('Player:', player);
-                
-                if (!player){
-                    io.to(socketId).emit('placeBetError', { error: 'Player not found' });
-                    return;
+
+                if (!player) {
+                    return io.to(socketId).emit('placeBetError', { error: 'Player not found' });
                 }
+
+                const round = await GameRound.findOne({ roundId });
+                if (!round) {
+                    return io.to(socketId).emit('placeBetError', { error: 'Round not found' });
+                }
+
+                const alreadyBet = round.bets.some(b => b.playerId.toString() === playerId);
+                // console.log('Already Bet:', alreadyBet);
+                
+                if (alreadyBet) {
+                    return io.to(socketId).emit('placeBetError', { error: 'Bet already placed for this round' });
+                }
+
                 const { cryptoAmount, price } = await convertUsdToCrypto(usdAmount, currency);
                 // console.log('Crypto Amount:', cryptoAmount);
                 // console.log('Price:', price);
                 
+
                 if (player.wallet[currency] < cryptoAmount) {
-                    io.to(socketId).emit('placeBetError', { error: 'Insufficient crypto balance' });
-                    return;
-                }
-                player.wallet[currency] -= cryptoAmount;
-                await player.save();
-
-                let round = await GameRound.findOne({ roundId });
-                if(!round){
-                    io.to(socketId).emit('placeBetError', { error: 'Round not found' });
-                    return;
+                    return io.to(socketId).emit('placeBetError', { error: 'Insufficient balance' });
                 }
 
-                round.bets.push({
+                // Atomic wallet deduction
+                const updatedPlayer = await Player.findByIdAndUpdate(
                     playerId,
-                    usdAmount,
-                    cryptoAmount,
-                    currency
-                });
+                    { $inc: { [`wallet.${currency}`]: -cryptoAmount } },
+                    { new: true }
+                );
 
-                await round.save();
+                // Atomic push to round bets
+                const updatedRound = await GameRound.findOneAndUpdate(
+                    { roundId },
+                    {
+                        $push: {
+                            bets: {
+                                playerId,
+                                usdAmount,
+                                cryptoAmount,
+                                currency,
+                                cashedOut: false,
+                                cashoutMultiplier: null,
+                                payoutUsd: null
+                            }
+                        }
+                    },
+                    { new: true }
+                );
 
+                // console.log('Updated Round:', updatedRound);
+                // console.log('Updated Player:', updatedPlayer);
+
+
+
+                if (!updatedRound) {
+                    return io.to(socketId).emit('placeBetError', { error: 'Round not found' });
+                }
+
+                // Transaction log
                 const tx = new Transaction({
                     playerId,
                     usdAmount,
@@ -146,18 +207,22 @@ function startGameLoop(httpServer) {
                     transactionHash: crypto.randomBytes(8).toString('hex'),
                     priceAtTime: price,
                 });
-
                 await tx.save();
 
-                io.to(socketId).emit('updateBalance', player.wallet);
-                io.to(socketId).emit('betPlaced', { roundId, usdAmount, cryptoAmount, currency });
-
+                io.to(socketId).emit('updateBalance', updatedPlayer.wallet);
+                io.to(socketId).emit('betPlaced', {
+                    roundId,
+                    usdAmount,
+                    cryptoAmount,
+                    currency
+                });
 
             } catch (error) {
                 console.error('Error placing bet:', error);
                 io.to(socketId).emit('placeBetError', { error: 'Internal server error' });
             }
-        }); 
+        });
+
     });
     runGameLoop();
 }
@@ -165,18 +230,22 @@ function startGameLoop(httpServer) {
 async function runGameLoop() {
     while (true) {
         const countdownSeconds = 10;
+
         const price = await fetchPrices();
         io.emit('currentPrice', { price });
-        // 5 second countdown before starting a new round
+
+        // Countdown before round starts
         for (let i = countdownSeconds; i > 0; i--) {
             io.emit('countdown', { seconds: i });
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
         io.emit('currentPrice', { price });
-        await beginRound();
-        io.emit('roundEnd', { roundId: currentRound.roundId });
-        currentRound = null; // Reset current round
+
+        // Start the round and get the roundId back
+        const roundId = await beginRound();
+
+        io.emit('roundEnd', { roundId });
 
         await new Promise(resolve => setTimeout(resolve, 1000));
     }
@@ -185,95 +254,57 @@ async function runGameLoop() {
 async function beginRound() {
     const seed = crypto.randomBytes(16).toString('hex');
     const crashMultiplier = getCrashPoint(seed);
+    const roundId = crypto.randomUUID();
 
-    currentRound = new GameRound({
-        roundId: crypto.randomUUID(),
+    const newRound = new GameRound({
+        roundId,
         startTime: new Date(),
         crashMultiplier,
         bets: [],
     });
 
-    await currentRound.save();
+    await newRound.save();
 
     io.emit('roundStart', {
-        roundId: currentRound.roundId,
-        startTime: currentRound.startTime,
+        roundId,
+        startTime: newRound.startTime,
         seed,
         crashMultiplier: "hidden",
     });
-    io.emit('currentPrice', { price: await fetchPrices() });
+
+    const price = await fetchPrices();
+    io.emit('currentPrice', { price });
 
     let multiplier = 1.0;
-    let startTime = Date.now();
-    const growthFactor = 1;
+    const startTime = Date.now();
+    const growthFactor = 0.6;
 
-    return new Promise(resolve => {
-        multiplierInterval = setInterval(async () => {
-            const timeElapsed = Math.max((Date.now() - startTime) / 1000, 0);
-            multiplier = +(Math.exp(timeElapsed * growthFactor)).toFixed(2);
+    return new Promise((resolve) => {
+        const interval = setInterval(async () => {
+            const timeElapsed = (Date.now() - startTime) / 1000;
+            multiplier = +Math.exp(timeElapsed * growthFactor).toFixed(2);
 
             io.emit('multiplierUpdate', { multiplier });
 
             if (multiplier >= crashMultiplier) {
-                clearInterval(multiplierInterval);
-                currentRound.ended = true;
-                await currentRound.save();
+                clearInterval(interval);
+
+                // Safely update only this round (by ID)
+                await GameRound.updateOne(
+                    { roundId },
+                    { $set: { ended: true } }
+                );
 
                 io.emit('multiplierUpdate', { multiplier: crashMultiplier });
-
                 io.emit('roundCrash', {
-                    roundId: currentRound.roundId,
+                    roundId,
                     crashMultiplier,
                 });
 
-                resolve(); // signal that round is done
+                resolve(roundId);
             }
         }, 100);
     });
 }
-
-// async function beginRound() {
-//     const seed = crypto.randomBytes(16).toString('hex');
-//     const crashMultiplier = getCrashPoint(seed);
-
-//     currentRound = new GameRound({
-//         roundId: crypto.randomUUID(),
-//         startTime: new Date(),
-//         crashMultiplier,
-//         bets: [],
-//     });
-
-//     await currentRound.save();
-
-//     io.emit('roundStart', {
-//         roundId: currentRound.roundId,
-//         startTime: currentRound.startTime,
-//         seed,
-//         crashMultiplier: "hidden",
-//     });
-
-//     let multiplier = 1.0;
-//     let startTime = Date.now();
-//     const growthFactor = 0.07; // Adjust growth factor
-
-//     multiplierInterval = setInterval(async () => {
-//         const timeElapsed = Math.max((Date.now() - startTime) / 1000, 0); // Ensure non-negative time in seconds
-//         multiplier = +(Math.exp(timeElapsed * growthFactor)).toFixed(2); // Exponential growth formula
-
-//         io.emit('multiplierUpdate', { multiplier });
-
-//         if (multiplier >= crashMultiplier) {
-//             clearInterval(multiplierInterval);
-//             currentRound.ended = true;
-//             await currentRound.save();
-
-//             io.emit('roundCrash', {
-//                 roundId: currentRound.roundId,
-//                 crashMultiplier,
-//             });
-//         }
-//     }, 100); // update every 100ms
-// }
-
 
 module.exports = { startGameLoop };
