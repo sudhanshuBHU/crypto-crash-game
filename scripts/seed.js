@@ -5,15 +5,15 @@ const Player = require('../models/Player');
 const players = [
   {
     username: 'satoshi',
-    wallet: { BTC: 0.01, ETH: 0.5 },
+    wallet: { BTC: 0.61, ETH: 4.5 },
   },
   {
     username: 'vitalik',
-    wallet: { BTC: 0.005, ETH: 1.0 },
+    wallet: { BTC: 0.5, ETH: 1.7 },
   },
   {
     username: 'nakamoto',
-    wallet: { BTC: 0.0025, ETH: 0.2 },
+    wallet: { BTC: 0.025, ETH: 2.2 },
   },
 ];
 

@@ -16,87 +16,88 @@ This is the backend implementation of **Crypto Crash**, a real-time multiplayer 
 ## ⚙️ Setup Instructions
 
 1. **Clone the repo**  
-git clone https://github.com/yourusername/crypto-crash.git
-cd crypto-crash
+  - git clone https://github.com/sudhanshuBHU/crypto-crash-game.git
+  - cd crypto-crash
 
 2. **Install dependencies**  
-npm install
+   npm install
 
 3. **Create `.env`**
-PORT=3000
-MONGO_URI=mongodb://localhost:27017/crypto_crash
-CRYPTO_API=https://api.coingecko.com/api/v3
+  - PORT=3000
+  - MONGO_URI=mongodb://localhost:27017/crypto_crash_sudhanshu
+  - CRYPTO_API=https://api.coingecko.com/api/v3
 
+**(make sure that MongoDB is running in the background)**
 
-4. **Seed test data**
-node scripts/seed.js
+4. **Seed test data** - sample profile with some currency to play
+  - node scripts/seed.js
 
 5. **Run the server**
-npm run dev
-
+   npm run dev
 
 6. **Open test client**  
-[http://localhost:3000/test-client.html](http://localhost:3000/test-client.html)
+   [http://localhost:3000/](http://localhost:3000/)
 
 ---
 
 ## 🔌 API Endpoints
 
-### ✅ Place Bet
-`POST /api/bets/place`
-```json
-{
-"playerId": "PLAYER_ID",
-"usdAmount": 10,
-"currency": "BTC"
-}
+- Get Prices
+- GET http://localhost:3000/api/crypto/prices
 
- Cash Out
-POST /api/cashout
-{
-  "playerId": "PLAYER_ID",
-  "roundId": "ROUND_ID",
-  "currentMultiplier": 2.5
-}
-Get Prices
-GET /api/crypto/prices
+`  {
+    "BTC": 103576,
+    "ETH": 2386.75
+    }
 
-💼 Check Balance
-GET /api/players/:id
+`
 
-🔁 WebSocket Events
+## 🔁 WebSocket Events
+
 🔔 Server → Client
-roundStart: { roundId, seed }
+- roundStart: { roundId, seed, startTime }
+- multiplierUpdate: { multiplier }
+- playerCashout: { playerId, roundId, multiplier, payoutUsd }
+- roundCrash: { crashMultiplier }
+- currentPrice: { price }
+- playerCashout: { playerId, roundId, multiplier, payoutUsd }
+- countdown: { seconds }
+- roundEnd: { roundId }
+- roundCrash: { roundId, crashMultiplier }
 
-multiplierUpdate: { multiplier }
-
-roundCrash: { crashMultiplier }
-
-playerCashout: { playerId, roundId, multiplier, payoutUsd }
 
 📤 Client → Server
-cashout: { playerId, roundId, multiplier }
+- cashout: { playerId, roundId, multiplier }
+- placeBet: { playerId, roundId, usdAmount, currency, socketId }
 
-🎲 Provably Fair Crash Algorithm
+
+## 🎲 Provably Fair Crash Algorithm
 Crash multiplier is generated using:
-const hash = sha256(seed); 
-const crash = (parseInt(hash.slice(0, 8), 16) % 10000) / 100;
+` const hash = crypto.createHash('sha256').update(seed).digest('hex');
+  const intVal = parseInt(hash.slice(0, 8), 16);
+  const max = 10000;
+  const result = (intVal % max) / 100;
+  // Force a minimum of 1.00x and up to 100.00x
+  return Math.max(1.00, result < 1.01 ? 1.01 : result);
+`
 
-Transparent
+- Transparent
+- Deterministic
+- Verifiable from seed
 
-Deterministic
+- USD ↔ Crypto Conversion
+- Uses real-time prices:
 
-Verifiable from seed
+- USD → Crypto at bet time
 
-USD ↔ Crypto Conversion
-Uses real-time prices:
+- Crypto → USD at cashout time
 
-USD → Crypto at bet time
-
-Crypto → USD at cashout time
-
-Example:
-
+### Example:
 $10 bet with BTC @ $60K = 0.00016667 BTC
-
 Cashout at 2x = 0.00033334 BTC, or $20
+```
+
+## 👤 Author
+
+- **Name**: Sudhanshu Shekhar
+- **Email**: sudhanshu.shekhar.bhu7@gmail.com

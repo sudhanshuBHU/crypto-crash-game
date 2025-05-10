@@ -362,7 +362,7 @@
     });
 
     socket.on('currentPrice', (data) => {
-      console.log("Current price received:", data.price.BTC, data.price.ETH);
+      // console.log("Current price received:", data.price.BTC, data.price.ETH);
       if (data.price.BTC) {
         document.getElementById('currBTC').textContent = data.price.BTC;
         document.getElementById('currETH').textContent = data.price.ETH;
@@ -397,17 +397,15 @@
 
     // Update playerId when selection changes
     document.getElementById('playerSelect').addEventListener('change', (event) => {
-      playerId = event.target.value;
-      socket.emit('selectPlayer', { socketId, playerId });
-      log(`Player selected: ${dataNames[playerId]}`);
+      playerDBId = event.target.value;
+      // console.log("Selected playerId:", playerId);
+      
+      socket.emit('selectPlayer', { socketId, playerId:playerDBId });
+      log(`Player selected: ${dataNames[playerDBId]}`);
+      playerId = dataNames[playerDBId];
     });
 
     function cashOut() {
-      // if (!roundId) {
-      //   log("⚠️ No round active.");
-      //   return;
-      // }
-
       socket.emit("cashout", {
         playerId: playerDBId,
         socketId,
@@ -450,7 +448,7 @@
       const betAmount = parseFloat(document.getElementById('betAmount').value);
       const btcPrice = parseFloat(document.getElementById('currBTC').textContent);
       const ethPrice = parseFloat(document.getElementById('currETH').textContent);
-      console.log("Bet amount:", betAmount, "BTC price:", btcPrice, "ETH price:", ethPrice);
+      // console.log("Bet amount:", betAmount, "BTC price:", btcPrice, "ETH price:", ethPrice);
       
       if (isNaN(betAmount) || betAmount <= 0 || isNaN(btcPrice) || isNaN(ethPrice)) {
         document.getElementById('bet-usd-btc').value = 0;
