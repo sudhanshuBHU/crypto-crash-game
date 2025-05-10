@@ -33,7 +33,7 @@ This is the backend implementation of **Crypto Crash**, a real-time multiplayer 
 
 **(make sure that MongoDB is running in the background)**
 
-4. **Seed test data** - sample profile with some currency to play
+4. **Seed test data** - test profiles with some currencies
   - ``` node scripts/seed.js ```
 
 5. **Run the server**
@@ -106,3 +106,8 @@ Crash multiplier is generated using:
 
 - **Name**: Sudhanshu Shekhar
 - **Email**: sudhanshu.shekhar.bhu7@gmail.com
+---
+
+# Images for reference
+![Postman Api test](public/images/postman.png)
+
